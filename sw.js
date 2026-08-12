@@ -1,9 +1,9 @@
-const CACHE_NAME="centro-quant-markets-v1-0";
+const CACHE_NAME="centro-quant-markets-v1-1";
 const CORE=[
   "./",
   "./index.html",
-  "./styles.css?v=1.0.0",
-  "./app.js?v=1.0.0",
+  "./styles.css?v=1.1.0",
+  "./app.js?v=1.1.0",
   "./manifest.webmanifest"
 ];
 

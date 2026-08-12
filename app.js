@@ -1,5 +1,5 @@
 
-// Markets v1.0 · base separada de Centro Quant Crypto · Twelve Data
+// Markets v1.1 · monitor optimizado para límites de API · conserva datos v1.0
 (function(){
   if(!("serviceWorker" in navigator)) return;
   let refreshing=false;
@@ -59,6 +59,25 @@ function showView(id){
 }
 $$(".bottom-nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
 
+const API_MIN_GAP_MS=9000; // protege planes con cuota baja
+let apiLastStart=0;
+let apiBackoffUntil=0;
+let apiQueue=Promise.resolve();
+const candleCache=new Map();
+const CANDLE_TTL={"15m":4*60e3,"1h":15*60e3,"4h":60*60e3,"1d":4*60*60e3,"1w":12*60*60e3};
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function queuedApi(task){
+  const run=apiQueue.then(async()=>{
+    const now=Date.now();
+    if(apiBackoffUntil>now) await sleep(apiBackoffUntil-now);
+    const wait=Math.max(0,API_MIN_GAP_MS-(Date.now()-apiLastStart));
+    if(wait) await sleep(wait);
+    apiLastStart=Date.now();
+    return task();
+  });
+  apiQueue=run.catch(()=>{});
+  return run;
+}
 async function api(path, params={}){
   const key=getMarketApiKey();
   if(!key) throw new Error("Falta API key de Twelve Data. Agrégala en Sistema.");
@@ -67,11 +86,17 @@ async function api(path, params={}){
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),15000);
   try{
-    const r=await fetch(url,{signal:controller.signal,cache:"no-store"});
-    if(!r.ok) throw new Error("API "+r.status);
-    const data=await r.json();
-    if(data.status==="error"||data.code) throw new Error(data.message||"Error de mercado");
-    return data;
+    return await queuedApi(async()=>{
+      const r=await fetch(url,{signal:controller.signal,cache:"no-store"});
+      if(r.status===429){
+        apiBackoffUntil=Date.now()+65000;
+        throw new Error("API 429 · pausa automática de 65 s");
+      }
+      if(!r.ok) throw new Error("API "+r.status);
+      const data=await r.json();
+      if(data.status==="error"||data.code) throw new Error(data.message||"Error de mercado");
+      return data;
+    });
   } finally {clearTimeout(timeout);}
 }
 
@@ -137,11 +162,16 @@ function analyze(candles){
     support:Math.min(...closedCandles.slice(-20).map(x=>x.l)),resistance:Math.max(...closedCandles.slice(-20).map(x=>x.h)),
     price,change:(price/signalPrice-1)*100,e20,e50,e200,longFactors,shortFactors};
 }
-async function getCandles(symbol,interval="1d",limit=500){
+async function getCandles(symbol,interval="1d",limit=500,force=false){
+  const cacheKey=`${symbol}:${interval}:${Math.min(limit,5000)}`;
+  const cached=candleCache.get(cacheKey),ttl=CANDLE_TTL[interval]||15*60e3;
+  if(!force&&cached&&(Date.now()-cached.at)<ttl) return cached.data;
   const raw=await api("/time_series",{symbol,interval:TF_MAP[interval]||interval,outputsize:Math.min(limit,5000),format:"JSON"});
   const values=(raw.values||[]).slice().reverse();
   if(values.length<30) throw new Error("Historial insuficiente para "+symbol);
-  return values.map(x=>({t:new Date(x.datetime.replace(" ","T")).getTime(),o:+x.open,h:+x.high,l:+x.low,c:+x.close,v:+x.volume||0}));
+  const data=values.map(x=>({t:new Date(x.datetime.replace(" ","T")).getTime(),o:+x.open,h:+x.high,l:+x.low,c:+x.close,v:+x.volume||0}));
+  candleCache.set(cacheKey,{at:Date.now(),data});
+  return data;
 }
 async function getTicker(symbol){
   const q=await api("/quote",{symbol});
@@ -429,16 +459,17 @@ async function refreshAll(){
   $("#refreshAllBtn").classList.add("loading");
   renderAssets();
   let ok=0;
-  await Promise.all(state.assets.map(async sym=>{
+  for(const sym of state.assets){
     try{
-      const [t,c1d,c4h]=await Promise.all([getTicker(sym),getCandles(sym,"1d",260),getCandles(sym,"4h",500)]);
+      const [c1d,c4h]=await Promise.all([getCandles(sym,"1d",260),getCandles(sym,"4h",500)]);
+      const t={lastPrice:c1d.at(-1).c,priceChangePercent:c1d.length>1?(c1d.at(-1).c/c1d.at(-2).c-1)*100:0};
       const daily=analyze(c1d),entry4h=analyze(c4h);
       state.market[sym]={daily,entry4h,timeframes:{"1d":daily,"4h":entry4h},price:+t.lastPrice,change:+t.priceChangePercent,
         longScore:daily.longScore,shortScore:daily.shortScore,longDecision:daily.longDecision,shortDecision:daily.shortDecision};
       ok++;
       renderAssets();renderRanking();renderHome();
     }catch(e){console.warn(sym,e)}
-  }));
+  }
   const mode=$("#marketModeSelect")?.value||"long";
   const scores=Object.values(state.market).map(x=>activeScore(x,mode));
   const avg=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):0;
@@ -705,7 +736,7 @@ async function backfillPaperMFE(){
   const missing=state.paperTrades.filter(t=>t.status!=="open"&&t.closedAt&&!(t.mfeR>=0));
   for(const t of missing){
     try{
-      const all=await getCandles(t.symbol,t.interval,5000);
+      const all=await getCandles(t.symbol,t.interval,800);
       const candles=all.filter(c=>c.t>=t.openedAt&&c.t<=t.closedAt);
       t.mfeR=0;t.mfePrice=t.entry;
       for(const c of candles){
@@ -734,7 +765,7 @@ function renderPaperMonitor(){
   if(paperMonitor.errors>0){stateClass="warn";stateLabel="Seguimiento con errores"}
   box.className=`paper-monitor ${stateClass}`;
   box.innerHTML=`<div class="paper-monitor-head"><div><span class="monitor-dot"></span><strong>${stateLabel}</strong></div><button id="paperCheckNowBtn" class="secondary compact-btn" ${paperTradeUpdateRunning?"disabled":""}>Revisar ahora</button></div>
-  <div class="paper-monitor-grid"><span>Última revisión<strong>${stamp}</strong></span><span>Abiertas al iniciar<strong>${paperMonitor.totalOpen}</strong></span><span>Revisadas<strong>${paperMonitor.checked}</strong></span><span>Cerradas<strong>${paperMonitor.closed}</strong></span><span>Errores<strong>${paperMonitor.errors}</strong></span><span>Próxima revisión<strong>${active?(paperTradeUpdateRunning?"al terminar":next===null?"~45 s":`~${next} s`):"—"}</strong></span></div>
+  <div class="paper-monitor-grid"><span>Última revisión<strong>${stamp}</strong></span><span>Abiertas al iniciar<strong>${paperMonitor.totalOpen}</strong></span><span>Revisadas<strong>${paperMonitor.checked}</strong></span><span>Cerradas<strong>${paperMonitor.closed}</strong></span><span>Errores<strong>${paperMonitor.errors}</strong></span><span>Próxima revisión<strong>${active?(paperTradeUpdateRunning?"al terminar":next===null?"según temporalidad":`~${next} s`):"—"}</strong></span></div>
   ${paperMonitor.lastError?`<div class="paper-monitor-error">Último error: ${String(paperMonitor.lastError).replace(/</g,"&lt;")}</div>`:""}`;
   const btn=$("#paperCheckNowBtn"); if(btn) btn.onclick=()=>updatePaperTrades(true);
 }
@@ -742,7 +773,7 @@ function renderPaperMonitor(){
 async function checkOnePaperTrade(t){
   const before=t.status;
   try{
-    const all=await getCandles(t.symbol,t.interval,5000);
+    const all=await getCandles(t.symbol,t.interval,800);
     const candles=all.filter(c=>c.t>=t.openedAt);
     if(!candles.length) return {ok:false,closed:false,error:"Sin velas devueltas"};
     t.current=candles.at(-1).c;
@@ -757,6 +788,7 @@ async function checkOnePaperTrade(t){
       if(targetHit){updateTradeMFE(t,c);t.status="win";t.exit=t.target;t.closedAt=c.t;break}
     }
     if(t.status!=="open") t.resultPct=(t.side==="long"?(t.exit/t.entry-1):(t.entry/t.exit-1))*100;
+    t.lastCheckedAt=Date.now();
     return {ok:true,closed:before==="open"&&t.status!=="open"};
   }catch(e){
     console.warn("paper",t.symbol,e);
@@ -772,8 +804,10 @@ async function updatePaperTrades(manual=false){
   paperMonitor.lastError="";
   renderPaperMonitor();
   try{
-    const open=state.paperTrades.filter(t=>t.status==="open");
-    paperMonitor.totalOpen=open.length; paperMonitor.checked=0; paperMonitor.closed=0; paperMonitor.errors=0;
+    const allOpen=state.paperTrades.filter(t=>t.status==="open");
+    const due=manual?allOpen:allOpen.filter(t=>Date.now()-(t.lastCheckedAt||0)>=paperCadenceMs(t.interval));
+    const open=due;
+    paperMonitor.totalOpen=allOpen.length; paperMonitor.checked=0; paperMonitor.closed=0; paperMonitor.errors=0;
     // Procesa hasta 6 posiciones a la vez para que una operación lenta no retrase a todas.
     for(let i=0;i<open.length;i+=PAPER_TRADE_CONCURRENCY){
       const batch=open.slice(i,i+PAPER_TRADE_CONCURRENCY);
@@ -798,11 +832,12 @@ async function updatePaperTrades(manual=false){
   }
 }
 
-// Mientras la PWA esté activa, revisa stops/objetivos cada 45 s.
-// iOS puede suspender JavaScript en segundo plano; al volver a primer plano
-// hacemos una revisión inmediata y updatePaperTrades reconstruye lo ocurrido
-// usando las velas desde openedAt.
-const PAPER_TRADE_CHECK_MS=45*1000;
+// Markets v1.1: cada operación se revisa según su temporalidad.
+// Al regresar a la app se reconstruye lo ocurrido con las velas desde openedAt.
+function paperCadenceMs(interval){
+  return ({"15m":5*60e3,"1h":15*60e3,"4h":60*60e3,"1d":4*60*60e3,"1w":12*60*60e3})[interval]||15*60e3;
+}
+const PAPER_TRADE_CHECK_MS=60*1000; // sólo despierta el monitor; consulta únicamente trades vencidos
 paperMonitor.nextRun=Date.now()+PAPER_TRADE_CHECK_MS;
 setInterval(renderPaperMonitor,1000);
 setInterval(()=>{
@@ -811,9 +846,7 @@ setInterval(()=>{
   }
 },PAPER_TRADE_CHECK_MS);
 document.addEventListener("visibilitychange",()=>{
-  if(document.visibilityState==="visible" && state.paperTrades.some(t=>t.status==="open")){
-    updatePaperTrades();
-  }
+  if(document.visibilityState==="visible" && state.paperTrades.some(t=>t.status==="open")) updatePaperTrades();
 });
 window.addEventListener("focus",()=>{
   if(state.paperTrades.some(t=>t.status==="open")) updatePaperTrades();
@@ -1069,7 +1102,15 @@ $("#trafficNeedsBtn").onclick=()=>{const box=$("#trafficNeeds"),btn=$("#trafficN
 $("#paperFilter").onchange=renderPaperTrades;
 $("#exportPaperBtn").onclick=exportPaperCSV;
 
-renderWeights();fillAssetSelects();renderAssets();renderRanking();renderPaperTrades();renderPaperMonitor();renderScannerResults();syncAutoPaperControls();if($("#homeTimeframeSelect"))$("#homeTimeframeSelect").value=state.homeInterval;renderHome();refreshAll().then(async()=>{await refreshHomeTimeframe(state.homeInterval);await updatePaperTrades();await backfillPaperMFE();renderPaperTrades();await scanAutoPaper();});
+renderWeights();fillAssetSelects();renderAssets();renderRanking();renderPaperTrades();renderPaperMonitor();renderScannerResults();syncAutoPaperControls();if($("#homeTimeframeSelect"))$("#homeTimeframeSelect").value=state.homeInterval;renderHome();
+(async()=>{
+  // Primero protegemos/actualizamos las operaciones heredadas de v1.0.
+  await updatePaperTrades();
+  renderPaperTrades();
+  // La carga general queda bajo petición para no consumir la cuota al abrir la PWA.
+  const status=$("#autoPaperStatus");
+  if(status&&state.autoPaper.enabled) status.textContent=`Activo · ${state.autoPaper.interval} · score ≥ ${state.autoPaper.threshold} · barrido manual para ahorrar API`;
+})();
 
 function syncMarketApiKeyUI(){
   const key=getMarketApiKey(), input=$("#marketApiKey"), status=$("#marketApiStatus");
