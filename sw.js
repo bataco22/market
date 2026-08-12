@@ -1,4 +1,4 @@
-const CACHE_NAME="centro-quant-markets-v1-1";
+const CACHE_NAME="centro-quant-markets-v1-2";
 const CORE=[
   "./",
   "./index.html",

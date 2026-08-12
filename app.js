@@ -1,5 +1,5 @@
 
-// Markets v1.1 · monitor optimizado para límites de API · conserva datos v1.0
+// Markets v1.2 · monitor optimizado para límites de API · conserva datos v1.0
 (function(){
   if(!("serviceWorker" in navigator)) return;
   let refreshing=false;
@@ -83,21 +83,39 @@ async function api(path, params={}){
   if(!key) throw new Error("Falta API key de Twelve Data. Agrégala en Sistema.");
   const url=new URL(TWELVE_BASE+path);
   Object.entries({...params,apikey:key}).forEach(([k,v])=>url.searchParams.set(k,v));
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),15000);
-  try{
-    return await queuedApi(async()=>{
-      const r=await fetch(url,{signal:controller.signal,cache:"no-store"});
-      if(r.status===429){
-        apiBackoffUntil=Date.now()+65000;
-        throw new Error("API 429 · pausa automática de 65 s");
+
+  // v1.2: el timeout empieza cuando la petición realmente llega a su turno.
+  // En v1.1 el AbortController se creaba ANTES de esperar en la cola; con varias
+  // consultas la petición podía abortarse sin siquiera haber comenzado.
+  return await queuedApi(async()=>{
+    let lastErr=null;
+    for(let attempt=0; attempt<2; attempt++){
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),45000);
+      try{
+        const r=await fetch(url,{signal:controller.signal,cache:"no-store"});
+        if(r.status===429){
+          apiBackoffUntil=Date.now()+65000;
+          throw new Error("API 429 · pausa automática de 65 s");
+        }
+        if(!r.ok) throw new Error("API "+r.status);
+        const data=await r.json();
+        if(data.status==="error"||data.code) throw new Error(data.message||"Error de mercado");
+        return data;
+      }catch(e){
+        lastErr=e;
+        const aborted=e?.name==="AbortError" || /aborted/i.test(String(e?.message||e));
+        if(aborted && attempt===0){
+          await sleep(5000);
+          continue;
+        }
+        throw e;
+      }finally{
+        clearTimeout(timeout);
       }
-      if(!r.ok) throw new Error("API "+r.status);
-      const data=await r.json();
-      if(data.status==="error"||data.code) throw new Error(data.message||"Error de mercado");
-      return data;
-    });
-  } finally {clearTimeout(timeout);}
+    }
+    throw lastErr||new Error("No se pudo consultar el mercado.");
+  });
 }
 
 function ema(values, period){
@@ -832,7 +850,7 @@ async function updatePaperTrades(manual=false){
   }
 }
 
-// Markets v1.1: cada operación se revisa según su temporalidad.
+// Markets v1.2: cada operación se revisa según su temporalidad.
 // Al regresar a la app se reconstruye lo ocurrido con las velas desde openedAt.
 function paperCadenceMs(interval){
   return ({"15m":5*60e3,"1h":15*60e3,"4h":60*60e3,"1d":4*60*60e3,"1w":12*60*60e3})[interval]||15*60e3;
@@ -1023,7 +1041,7 @@ function createFullBackup(){
   }
   const backup={
     app:"Centro Quant Markets",
-    version:"6.6.0",
+    version:"1.2",
     format:1,
     createdAt:new Date().toISOString(),
     data

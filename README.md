@@ -1,4 +1,4 @@
-# Centro Quant Markets v1.1.1
+# Centro Quant Markets v1.2.1
 
 Copia separada de Centro Quant Crypto para experimentar el mismo motor cuantitativo sobre otros mercados.
 
