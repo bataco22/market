@@ -1,0 +1,22 @@
+{
+  "name": "Centro Quant Markets v1",
+  "short_name": "Quant Markets",
+  "description": "Centro Quant Markets: laboratorio cuantitativo separado para acciones, índices, metales y commodities.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07101d",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

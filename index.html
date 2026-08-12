@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Quant Centro" />
+  <title>Centro de Trading Cuantitativo</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css?v=1.0.0" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Uso personal · Datos públicos</p>
+      <div class="brand-line"><h1>Centro Quant Markets</h1><span class="version-badge">v1.0</span></div>
+    </div>
+    <button id="refreshAllBtn" class="icon-btn" aria-label="Actualizar">↻</button>
+  </header>
+
+  <main>
+    <section id="homeView" class="view active home-v6">
+      <div class="v6-release-banner"><span class="release-dot"></span><div><strong>Centro Quant Markets v1 activo</strong><small>Acciones · índices vía ETF · metales · commodities · paper trading.</small></div></div>
+
+      <article class="decision-hero">
+        <div class="decision-topline">
+          <span id="homePair" class="home-pair">Analizando favoritos…</span>
+          <div class="home-time-controls">
+            <label for="homeTimeframeSelect">Score</label>
+            <select id="homeTimeframeSelect" class="compact-select" aria-label="Temporalidad del Score de Inicio">
+              <option value="15m">15 min</option>
+              <option value="1h">1 hora</option>
+              <option value="4h">4 horas</option>
+              <option value="1d" selected>1 día</option>
+              <option value="1w">1 semana</option>
+            </select>
+            <span id="homeUpdated" class="pill">Sin actualizar</span>
+          </div>
+        </div>
+        <div class="decision-main">
+          <div class="decision-score-wrap">
+            <span id="homeScoreLabel">Score 1D</span>
+            <strong id="homeScore">--</strong>
+            <small id="homeSide">Buscando oportunidad</small>
+          </div>
+          <div class="decision-copy">
+            <p id="homeDecision" class="home-decision neutral">ESPERANDO DATOS</p>
+            <h2 id="homeHeadline">Conectando con el mercado público</h2>
+            <p id="homeSummary">El sistema comparará tus favoritos y mostrará la oportunidad que merece revisión.</p>
+          </div>
+        </div>
+        <div class="home-kpis">
+          <div><span>Confianza</span><strong id="homeConfidence">--</strong></div>
+          <div><span>Riesgo técnico</span><strong id="homeRisk">--</strong></div>
+          <div><span>Regla R/B</span><strong>1 : 3</strong></div>
+        </div>
+      </article>
+
+      <div class="home-actions">
+        <button id="homeAnalyzeBtn" class="primary">Ver análisis completo</button>
+        <button id="homePaperBtn" class="secondary">Simular operación</button>
+      </div>
+
+      <section class="home-grid">
+        <article class="home-panel">
+          <div class="home-panel-head"><div><p class="eyebrow">Razones</p><h2>¿Por qué aparece aquí?</h2></div><span class="help-symbol">?</span></div>
+          <div id="homeReasons" class="reason-list"><div class="reason-row neutral"><span>•</span><p>Esperando indicadores del mercado.</p></div></div>
+        </article>
+
+        <article class="home-panel">
+          <div class="home-panel-head"><div><p class="eyebrow">Pulso</p><h2>Mercado observado</h2></div></div>
+          <div class="pulse-grid">
+            <div><span>Analizados</span><strong id="homeAnalyzed">0</strong></div>
+            <div><span>Favorables</span><strong id="homeFavorable">0</strong></div>
+            <div><span>Neutrales</span><strong id="homeNeutral">0</strong></div>
+            <div><span>Evitar</span><strong id="homeAvoid">0</strong></div>
+          </div>
+          <button id="homeMarketBtn" class="ghost wide">Abrir ranking del mercado</button>
+          <button id="homeBacktestBtn" class="ghost wide home-secondary-link">Abrir laboratorio Backtest</button>
+        </article>
+      </section>
+
+      <div class="notice home-notice"><strong>Regla de uso:</strong> el Inicio selecciona la mejor lectura disponible, pero una señal favorable no sustituye el stop, el tamaño de posición ni la confirmación de entrada.</div>
+    </section>
+
+    <section id="dashboardView" class="view">
+      <div class="hero-card">
+        <div>
+          <p class="muted">Estado de tus favoritos</p>
+          <h2 id="marketSummary">Cargando mercado…</h2>
+        </div>
+        <span id="lastUpdate" class="pill">Sin actualizar</span>
+      </div>
+
+      <div class="section-title">
+        <div>
+          <h2>Mercado Hoy</h2>
+          <p>Ranking automático según oportunidad Long o Short.</p>
+        </div>
+        <select id="marketModeSelect" class="compact-select">
+          <option value="long" selected>Long</option>
+          <option value="short">Short</option>
+        </select>
+      </div>
+      <div id="marketRanking" class="ranking-list"></div>
+
+      <div class="section-title">
+        <div>
+          <h2>Favoritos</h2>
+          <p>Scores Long y Short separados.</p>
+        </div>
+        <button id="addAssetBtn" class="primary small">+ Agregar</button>
+      </div>
+      <div id="assetGrid" class="asset-grid"></div>
+
+      <div class="notice">
+        <strong>Importante:</strong> el score mide cuántas condiciones favorables se cumplen. No es una probabilidad garantizada de subida.
+      </div>
+    </section>
+
+    <section id="analysisView" class="view">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Análisis cuantitativo</p>
+          <h2 id="analysisTitle">Selecciona un activo</h2>
+        </div>
+        <button id="backToDashboard" class="ghost">← Volver</button>
+      </div>
+
+      <div class="controls-row">
+        <select id="analysisModeSelect">
+          <option value="long" selected>Lectura Long</option>
+          <option value="short">Lectura Short</option>
+        </select>
+        <select id="timeframeSelect">
+          <option value="15m">15 minutos</option>
+          <option value="1h">1 hora</option>
+          <option value="4h">4 horas</option>
+          <option value="1d" selected>Diario</option>
+          <option value="1w">Semanal</option>
+          <option value="1M">Mensual</option>
+        </select>
+        <button id="refreshAnalysisBtn" class="secondary">Actualizar</button>
+      </div>
+
+      <div class="analysis-top">
+        <div class="score-card">
+          <span class="muted">Score cuantitativo</span>
+          <strong id="mainScore">--</strong>
+          <span id="mainDecision" class="decision neutral">Sin datos</span>
+        </div>
+        <div class="metric-card">
+          <span>Precio</span><strong id="analysisPrice">--</strong>
+          <small id="analysisChange">--</small>
+        </div>
+      </div>
+
+      <article class="traffic-card" id="trafficCard">
+        <div class="traffic-head">
+          <div>
+            <p class="eyebrow">Semáforo inteligente</p>
+            <h3 id="trafficTitle">Esperando análisis</h3>
+            <p id="trafficMessage">El sistema combinará score y calidad de los factores para darte una instrucción clara.</p>
+          </div>
+          <div id="trafficLight" class="traffic-light neutral" aria-label="Semáforo sin datos">
+            <span class="light red"></span><span class="light yellow"></span><span class="light green"></span>
+          </div>
+        </div>
+        <div id="trafficReasons" class="traffic-reasons"><div class="reason-row neutral"><span>•</span><p>Selecciona un activo y espera los datos.</p></div></div>
+        <button id="trafficNeedsBtn" class="ghost wide" type="button" aria-expanded="false">¿Qué tendría que pasar para ponerse en verde?</button>
+        <div id="trafficNeeds" class="traffic-needs" hidden></div>
+        <small class="traffic-rule">El verde valida la lectura técnica. Antes de operar, el simulador debe confirmar un riesgo/beneficio mínimo de 1:3.</small>
+      </article>
+
+      <article class="score-engine-card">
+        <div class="score-engine-head">
+          <div><p class="eyebrow">Motor del Score</p><h3>De dónde salen los puntos</h3><p>Cada factor aporta una parte de su peso máximo según la lectura actual.</p></div>
+          <span id="scoreWeightTotal" class="pill">Pesos: 100</span>
+        </div>
+        <div id="scoreBreakdown" class="score-breakdown"><div class="notice">Selecciona un activo para ver el desglose.</div></div>
+      </article>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <div>
+            <strong>Precio y medias</strong>
+            <small id="chartCaption">Últimas velas</small>
+          </div>
+          <div class="legend"><span>Precio</span><span>EMA20</span><span>EMA50</span></div>
+        </div>
+        <canvas id="priceChart" width="900" height="420"></canvas>
+      </div>
+
+      <div id="diagnosticGrid" class="diagnostic-grid"></div>
+
+      <div class="explanation-card">
+        <h3>Lectura clara</h3>
+        <p id="plainExplanation">Selecciona un activo para obtener el diagnóstico.</p>
+      </div>
+    </section>
+
+    <section id="backtestView" class="view">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Laboratorio</p>
+          <h2>Laboratorio automático</h2>
+          <p>La app recorre el historial y abre/cierra simulaciones automáticamente según el Score, stop y objetivo.</p>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-grid">
+          <label>Activo
+            <select id="btSymbol"></select>
+          </label>
+          <label>Temporalidad
+            <select id="btInterval">
+              <option value="15m">15 minutos</option>
+              <option value="1h">1 hora</option>
+              <option value="4h" selected>4 horas</option>
+              <option value="1d">Diario</option>
+              <option value="1w">Semanal</option>
+            </select>
+          </label>
+          <label>Motor de entrada
+            <select id="btPreset">
+              <option value="score" selected>Score Centro Quant automático</option>
+              <option value="trend">Clásico: tendencia EMA + RSI</option>
+              <option value="pullback">Clásico: retroceso EMA20</option>
+              <option value="breakout">Clásico: ruptura + volumen</option>
+            </select>
+          </label>
+          <label>Score mínimo
+            <input id="btScoreThreshold" type="number" value="85" min="50" max="100" step="1" />
+          </label>
+          <label>Dirección
+            <select id="btDirection"><option value="auto" selected>Automática Long / Short</option><option value="long">Solo Long</option><option value="short">Solo Short</option></select>
+          </label>
+          <label>Capital inicial
+            <input id="btCapital" type="number" value="10000" min="100" />
+          </label>
+          <label>Stop %
+            <input id="btStop" type="number" value="3" min="0.2" step="0.1" />
+          </label>
+          <label>Objetivo %
+            <input id="btTarget" type="number" value="9" min="0.2" step="0.1" />
+          </label>
+          <label>Comisión por lado %
+            <input id="btFee" type="number" value="0.1" min="0" step="0.01" />
+          </label>
+          <label>Riesgo por operación %
+            <input id="btRisk" type="number" value="1" min="0.1" max="10" step="0.1" />
+          </label>
+        </div>
+        <button id="runBacktestBtn" class="primary wide">Ejecutar simulaciones automáticas</button>
+        <div id="btAutoSummary" class="auto-summary">Usa Score 85 como punto de partida. Después puedes probar 80, 75 o 90 y comparar.</div>
+      </div>
+
+      <div id="btResults" class="results-grid hidden"></div>
+      <div id="btEquityWrap" class="chart-card hidden">
+        <div class="chart-head"><strong>Curva de capital</strong><small>Resultado simulado</small></div>
+        <canvas id="equityChart" width="900" height="360"></canvas>
+      </div>
+      <div class="notice">
+        Un backtest no garantiza resultados futuros. Sirve para descartar ideas débiles y medir reglas antes de arriesgar dinero.
+      </div>
+    </section>
+
+
+    <section id="paperView" class="view paper-v5">
+      <div class="new-version-banner"><strong>✓ NUEVA BASE ACTIVA</strong><span>Laboratorio separado: riesgo, R/B, diario y aprendizaje.</span></div>
+      <div class="section-title paper-hero">
+        <div>
+          <p class="eyebrow">Laboratorio Markets · v1.0</p>
+          <h2>Simulador y diario de operaciones</h2>
+          <p>Planea la entrada, valida el riesgo y aprende de tus resultados sin usar dinero real.</p>
+        </div>
+        <button id="refreshPaperBtn" class="secondary">Revisar abiertas</button>
+      </div>
+
+      <div class="auto-paper-card">
+        <div class="auto-paper-head"><div><p class="eyebrow">Piloto automático</p><h3>Paper trading automático</h3><p>Cuando la app está abierta (y al volver a abrirla), escanea una cesta separada de acciones grandes y ETFs representativos de índices, metales y commodities. Crea simulaciones sólo si alcanzan el Score indicado.</p></div><label class="switch-line"><input id="autoPaperEnabled" type="checkbox" /><span>Activar</span></label></div>
+        <div class="auto-paper-grid">
+          <label>Temporalidad<select id="autoPaperInterval"><option value="15m">15 min</option><option value="1h">1 hora</option><option value="4h" selected>4 horas</option><option value="1d">Diario</option><option value="1w">Semanal</option></select></label>
+          <label>Score mínimo<input id="autoPaperThreshold" type="number" min="50" max="100" value="85" /></label>
+          <label>Stop %<input id="autoPaperStop" type="number" min="0.2" step="0.1" value="3" /></label>
+          <label>Objetivo %<input id="autoPaperTarget" type="number" min="0.2" step="0.1" value="9" /></label>
+          <label>Riesgo %<input id="autoPaperRisk" type="number" min="0.1" max="10" step="0.1" value="1" /></label>
+          <label>Capital simulado<input id="autoPaperCapital" type="number" min="100" value="20000" /></label>
+        </div>
+        <div class="scanner-universe-note"><strong>Radar Markets:</strong> acciones grandes + ETFs de índices/metales/commodities → Score Long/Short → R/B mínimo 1:3.</div>
+        <div class="auto-paper-footer"><span id="autoPaperStatus">Apagado</span><button id="scanAutoPaperBtn" class="secondary">Revisar señales ahora</button></div>
+        <small class="muted">En iPhone una PWA no puede garantizar ejecución continua cuando está totalmente cerrada; el barrido se hace con la app abierta, al abrirla y al actualizar.</small>
+      </div>
+
+      <div class="scanner-results-card">
+        <div class="scanner-results-head"><div><p class="eyebrow">Radar Markets</p><h3>Último barrido del mercado</h3><p id="scannerResultsMeta">Aún no hay un barrido terminado.</p></div><div class="scanner-legend"><span class="dot signal"></span>85+ señal <span class="dot watch"></span>70–84 vigilar</div></div>
+        <div id="scannerResults" class="scanner-results"></div>
+        <small class="muted">Aquí aparecen los instrumentos que realmente logró analizar. Se ordenan por el mejor Score entre Long y Short.</small>
+      </div>
+      <div class="paper-layout">
+        <div class="form-card paper-entry-card">
+          <div class="paper-card-title"><span class="step-number">1</span><div><strong>Nueva operación</strong><small>Define la idea antes de entrar</small></div></div>
+          <div class="form-grid">
+            <label>Activo<select id="paperSymbol"></select></label>
+            <label>Dirección<select id="paperSide"><option value="long">Long</option><option value="short">Short</option></select></label>
+            <label>Temporalidad<select id="paperInterval"><option value="15m">15 minutos</option><option value="1h">1 hora</option><option value="4h">4 horas</option><option value="1d" selected>Diario</option><option value="1w">Semanal</option></select></label>
+            <label>Entrada<input id="paperEntry" type="number" step="any" placeholder="Precio actual automático" /></label>
+            <label>Stop por<select id="paperStopMode"><option value="percent">Porcentaje</option><option value="price">Precio</option></select></label>
+            <label>Stop<input id="paperStop" type="number" step="any" value="3" /></label>
+            <label>Objetivo por<select id="paperTargetMode"><option value="percent">Porcentaje</option><option value="price">Precio</option></select></label>
+            <label>Objetivo<input id="paperTarget" type="number" step="any" value="9" /></label>
+            <label>Capital disponible<input id="paperCapital" type="number" min="0" step="any" value="20000" /></label>
+            <label>Riesgo máximo %<input id="paperRiskPct" type="number" min="0.1" max="10" step="0.1" value="1" /></label>
+            <label class="full-field">Motivo o notas<textarea id="paperNotes" rows="3" placeholder="Ej. Score alto, tendencia alineada y volumen confirmando"></textarea></label>
+          </div>
+          <div class="trade-checklist">
+            <strong>Lista de control antes de guardar</strong>
+            <label><input id="checkTrend" type="checkbox" /> La tendencia apoya la dirección</label>
+            <label><input id="checkSignal" type="checkbox" /> Existe una señal concreta de entrada</label>
+            <label><input id="checkRisk" type="checkbox" /> Acepto la pérdida definida por el stop</label>
+            <label><input id="checkNoImpulse" type="checkbox" /> No estoy entrando por impulso o FOMO</label>
+          </div>
+          <div id="paperPreview" class="paper-analysis-panel">Selecciona los datos. Al guardar se capturarán score, RSI, ADX, ATR, volumen y medias.</div>
+          <button id="savePaperBtn" class="primary wide">Guardar operación simulada</button>
+        </div>
+
+        <aside class="paper-guide-card">
+          <div class="paper-card-title"><span class="step-number">2</span><div><strong>Reglas de control</strong><small>Tu filtro antes de operar</small></div></div>
+          <div class="rule-row"><span>Riesgo máximo</span><strong>1% sugerido</strong></div>
+          <div class="rule-row"><span>R/B mínimo</span><strong>1 : 3</strong></div>
+          <div class="rule-row"><span>Operaciones abiertas</span><strong id="paperOpenCount">0</strong></div>
+          <p class="muted compact-note">Una operación puede tener score alto y aun así no cumplir tu gestión de riesgo.</p>
+        </aside>
+      </div>
+
+      <div class="section-title paper-section-head"><div><p class="eyebrow">Seguimiento</p><h2>Operaciones abiertas</h2><p>La app revisa stops y objetivos automáticamente cada 45 segundos mientras está activa.</p></div></div>
+      <div id="paperMonitor" class="paper-monitor"></div>
+      <div id="paperOpenList" class="paper-list"></div>
+
+      <div class="section-title paper-section-head"><div><p class="eyebrow">Estadísticas</p><h2>Diario de resultados</h2><p>Historial, rendimiento acumulado y patrones de tu sistema.</p></div></div>
+      <div id="paperStats" class="results-grid"></div>
+      <div class="section-head mfe-head"><div><h3>🎯 ¿Hasta dónde llegaron realmente?</h3><p>Máximo avance favorable antes del cierre, medido en R.</p></div></div>
+      <div id="paperMfeStats" class="results-grid mfe-grid"></div>
+      <div id="paperInsights" class="insights-card"></div>
+      <div class="journal-toolbar">
+        <select id="paperFilter">
+          <option value="all">Todo el diario</option>
+          <option value="wins">Solo ganadoras</option>
+          <option value="losses">Solo perdedoras</option>
+          <option value="long">Solo Long</option>
+          <option value="short">Solo Short</option>
+        </select>
+        <button id="exportPaperBtn" class="secondary">Exportar CSV</button>
+      </div>
+      <div id="paperClosedList" class="paper-list"></div>
+    </section>
+
+    <section id="positionView" class="view">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Gestión de riesgo</p>
+          <h2>Calculadora de posición</h2>
+        </div>
+      </div>
+      <div class="form-card">
+        <div class="form-grid">
+          <label>Capital disponible
+            <input id="posCapital" type="number" value="20000" />
+          </label>
+          <label>Riesgo máximo %
+            <input id="posRisk" type="number" value="1" step="0.1" />
+          </label>
+          <label>Precio de entrada
+            <input id="posEntry" type="number" placeholder="Ej. 65000" step="any" />
+          </label>
+          <label>Stop loss
+            <input id="posStop" type="number" placeholder="Ej. 63000" step="any" />
+          </label>
+          <label>Objetivo
+            <input id="posTarget" type="number" placeholder="Ej. 71000" step="any" />
+          </label>
+        </div>
+        <button id="calcPositionBtn" class="primary wide">Calcular operación</button>
+      </div>
+      <div id="positionResults" class="results-grid hidden"></div>
+    </section>
+
+    <section id="settingsView" class="view">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Configuración</p>
+          <h2>Sistema cuantitativo</h2>
+          <p>Estos pesos determinan el score. Después podremos ajustarlos con evidencia del backtest.</p>
+        </div>
+      </div>
+      <div class="form-card" style="margin-bottom:14px">
+        <div class="weight-summary"><div><strong>Fuente de datos · Twelve Data</strong><small>La clave queda guardada sólo en este dispositivo.</small></div><strong id="marketApiStatus">Sin clave</strong></div>
+        <label>API key de Twelve Data<input id="marketApiKey" type="password" autocomplete="off" placeholder="Pega aquí tu API key" /></label>
+        <button id="saveMarketApiKey" type="button" class="primary wide">Guardar clave de mercado</button>
+        <small class="muted">Markets v1 necesita esta clave para consultar velas y precios. Crypto permanece totalmente separado.</small>
+      </div>
+      <div class="form-card">
+        <div class="weight-summary"><div><strong>Personaliza tu estrategia</strong><small>Los seis pesos deben sumar 100.</small></div><strong id="weightsTotal">100 / 100</strong></div>
+        <div class="weight-presets">
+          <button type="button" class="ghost" data-weight-preset="balanced">Equilibrado</button>
+          <button type="button" class="ghost" data-weight-preset="trend">Tendencia</button>
+          <button type="button" class="ghost" data-weight-preset="momentum">Momentum</button>
+        </div>
+        <div id="weightsForm" class="weights"></div>
+        <button id="saveWeightsBtn" class="primary wide">Guardar y recalcular</button>
+        <div class="backup-tools">
+          <button id="backupDataBtn" type="button" class="secondary wide">Crear respaldo completo</button>
+          <button id="restoreDataBtn" type="button" class="ghost wide">Cargar respaldo</button>
+          <input id="restoreDataInput" type="file" accept="application/json,.json" hidden />
+          <small class="muted">El respaldo incluye activos, pesos, temporalidad de Inicio y todas las operaciones de Pruebas guardadas en este dispositivo.</small>
+        </div>
+        <button id="resetDataBtn" class="danger wide">Restablecer aplicación</button>
+      </div>
+      <div class="notice">
+        Los datos personales y preferencias se guardan localmente en este dispositivo. La API key de datos se guarda sólo en el almacenamiento local de este dispositivo y no se incluye en los respaldos.
+      </div>
+    </section>
+  </main>
+  <div class="build-label">Centro Quant Markets v1.0 · Laboratorio separado</div>
+
+  <nav class="bottom-nav">
+    <button data-view="homeView" class="active"><span>⌂</span>Inicio</button>
+    <button data-view="dashboardView"><span>▥</span>Mercado</button>
+    <button data-view="paperView"><span>✎</span>Pruebas</button>
+    <button data-view="positionView"><span>◎</span>Riesgo</button>
+    <button data-view="settingsView"><span>⚙</span>Sistema</button>
+  </nav>
+
+  <dialog id="assetDialog">
+    <form method="dialog" class="dialog-card">
+      <h3>Agregar instrumento</h3>
+      <p>Escribe el ticker. Ejemplos: AAPL, MSFT, SPY, GLD, USO.</p>
+      <input id="newAssetInput" maxlength="12" autocomplete="off" placeholder="AAPL" />
+      <div class="dialog-actions">
+        <button value="cancel" class="ghost">Cancelar</button>
+        <button id="confirmAddAsset" value="default" class="primary">Agregar</button>
+      </div>
+      <p id="assetDialogError" class="error"></p>
+    </form>
+  </dialog>
+
+  <script src="./app.js?v=1.0.0"></script>
+
+<div id="appVersionBadge" style="position:fixed;right:8px;bottom:8px;z-index:9999;font-size:10px;opacity:.45;pointer-events:none">Markets v1.0</div>
+</body>
+</html>
